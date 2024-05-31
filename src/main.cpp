@@ -3,8 +3,14 @@ extern "C" {
   #include "user_interface.h"
 }
 
-// Ziel-MAC-Adresse, die wir überwachen möchten
-uint8_t target_mac[6] = {0x00, 0x22, 0xaa, 0x0b, 0xcb, 0x95};
+// Ziel-MAC-Adressen, die wir überwachen möchten
+uint8_t target_macs[][6] = {
+  {0x00, 0x22, 0xAA, 0x0B, 0xCB, 0x95},
+  {0xCC, 0xFB, 0x65, 0x01, 0x48, 0x32},
+  // Füge hier weitere MAC-Adressen hinzu
+};
+
+const int num_target_macs = sizeof(target_macs) / sizeof(target_macs[0]);
 
 // Prototypen der verwendeten Funktionen
 void promiscuous_cb(uint8_t *buf, uint16_t len);
@@ -50,7 +56,6 @@ struct ieee80211_hdr {
 };
 
 void setup() {
-  pinMode(LED_BUILTIN, OUTPUT);
   Serial.begin(115200);
   wifi_set_opmode(STATION_MODE);
   wifi_set_promiscuous_rx_cb(promiscuous_cb);
@@ -65,9 +70,8 @@ void promiscuous_cb(uint8_t *buf, uint16_t len) {
   struct RxControl *rx = (struct RxControl *)buf;
   struct ieee80211_hdr *hdr = (struct ieee80211_hdr *)(buf + sizeof(struct RxControl));
 
-  // Überprüfen, ob das Paket von der Ziel-MAC-Adresse stammt
+  // Überprüfen, ob das Paket von einer der Ziel-MAC-Adressen stammt
   if (is_target_mac(hdr->addr2)) {
-    digitalWrite(LED_BUILTIN, LOW);
     Serial.print("Packet from target MAC: ");
     for (int i = 0; i < 6; i++) {
       Serial.printf("%02X", hdr->addr2[i]);
@@ -82,13 +86,19 @@ void promiscuous_cb(uint8_t *buf, uint16_t len) {
       if ((i + 1) % 16 == 0) Serial.println();
     }
     Serial.println();
-    digitalWrite(LED_BUILTIN, HIGH);
   }
 }
 
 bool is_target_mac(uint8_t *mac) {
-  for (int i = 0; i < 6; i++) {
-    if (mac[i] != target_mac[i]) return false;
+  for (int i = 0; i < num_target_macs; i++) {
+    bool match = true;
+    for (int j = 0; j < 6; j++) {
+      if (mac[j] != target_macs[i][j]) {
+        match = false;
+        break;
+      }
+    }
+    if (match) return true;
   }
-  return true;
+  return false;
 }
